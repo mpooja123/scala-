@@ -1,0 +1,85 @@
+import random
+import os
+from pyspark.sql.functions import col, lit, when
+from datetime import date, datetime
+from pyspark.sql.functions import col, lit, to_date
+import pandas as pd
+from awsglue.context import GlueContext
+from awsglue.transforms import *
+from pyspark.context import SparkContext
+from pyspark.sql import SQLContext
+from awsglue.dynamicframe import DynamicFrame
+from awsglue.utils import getResolvedOptions
+import sys
+import json
+import time
+from pyspark.sql.window import Window
+from pyspark.sql.types import StringType
+import pyspark.sql.functions as func
+
+spark_context = SparkContext()
+glueContext = GlueContext(spark_context)
+sqlContext = SQLContext(spark_context)
+spark = glueContext.spark_session
+
+df_order_table = glueContext.create_dynamic_frame_from_options(connection_type='s3',
+                                                                                       connection_options={
+                                                                                           "paths": ['s3 path']
+                                                                                       },
+                                                                                       format='csv',
+                                                                                       format_options={
+                                                                                           "withHeader": True}
+                                                                                       ).toDF()
+
+df_order_table.show()
+
+df_customer_table = glueContext.create_dynamic_frame_from_options(connection_type='s3',
+                                                                                       connection_options={
+                                                                                           "paths": ['s3 path']
+                                                                                       },
+                                                                                       format='csv',
+                                                                                       format_options={
+                                                                                           "withHeader": True}
+                                                                                       ).toDF()
+
+df_customer_table.show()
+
+
+###inner join
+df_join=df_order_table.join(df_customer_table, on=(df_order_table['customer_id']==df_customer_table['customer_id']),
+                              how='inner').select(df_customer_table['customer_id'],df_order_table['order_id'],df_order_table['order_datetime'])
+
+df_join.show()
+
+
+#get the customer who have ordered in last 7 days
+df_data=df_join.withColumn('order_date',to_date(col('order_datetime'),'yyyymmdd'))
+df_data.show()
+
+###left outer join
+
+df_customer_filter=df_customer_table.where(col('age')>20)
+
+bb1=df_order_table.where(col('customer_id')=='b28')
+bb1.show()
+bb=df_customer_filter.where(col('customer_id')=='b28')
+bb.show()
+
+df_data1=df_customer_filter.join(func.broadcast(df_order_table), on=(df_order_table['customer_id']==df_customer_filter['customer_id']),
+                              how='left_outer').select(df_customer_filter['customer_id'],df_order_table['order_id'],df_order_table['item_id'])
+
+
+bb=df_data1.where(col('customer_id')=='b28')
+bb.show()
+########customer who have placed more than 10 order:
+
+df_10_orders = df_data1.groupBy('customer_id').agg(func.count(col('order_id')))
+
+df_10_orders.show()
+df_10_orders=df_10_orders.where(col('count(order_id)')==2)
+df_10_orders.show()
+
+df_data1.coalesce(1)
+df_data1.write.mode('Overwrite').format('csv').save(
+                's3 path',
+                header='true')
