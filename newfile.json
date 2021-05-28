@@ -1,0 +1,13 @@
+{
+  "Schema": {
+    "src_file_path": "s3://slf-ca-dev-glue/amp/test/testing_schema/orders.csv",
+    "src_file_path_2": "s3://slf-ca-dev-glue/amp/test/testing_schema/customer.csv",
+    "format": "csv",
+    "tgt_output_path": "s3://slf-ca-dev-glue/amp/test/testing_schema/output",
+    "tgt_record_count_limit": "100",
+    "output_file_frmt": "parquet",
+    "result_delimiter": ",",
+    "parent_info": {
+    }
+  }
+}
